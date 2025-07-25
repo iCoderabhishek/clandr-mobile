@@ -1,3 +1,4 @@
+import { useDeleteEvent, useUpdateEvent } from "@/lib/queries";
 import { Trash2, X } from "lucide-react-native";
 import React, { useState } from "react";
 import {
@@ -18,27 +19,28 @@ interface Event {
   active: boolean;
   bookings: number;
   created: string;
+  userId: string;
 }
 
 interface EditEventModalProps {
   visible: boolean;
   event: Event | null;
   onClose: () => void;
-  onSave: (event: Event) => void;
-  onDelete: (eventId: number) => void;
 }
 
 export default function EditEventModal({
   visible,
   event,
   onClose,
-  onSave,
-  onDelete,
 }: EditEventModalProps) {
+  const updateEventMutation = useUpdateEvent();
+  const deleteEventMutation = useDeleteEvent();
+
   const [title, setTitle] = useState(event?.title || "");
   const [description, setDescription] = useState(event?.description || "");
   const [duration, setDuration] = useState(event?.duration?.toString() || "60");
   const [active, setActive] = useState(event?.active || true);
+  const [isLoading, setIsLoading] = useState(false);
 
   React.useEffect(() => {
     if (event) {
@@ -49,19 +51,29 @@ export default function EditEventModal({
     }
   }, [event]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!event || !title.trim()) return;
 
-    const updatedEvent: Event = {
-      ...event,
+    setIsLoading(true);
+
+    const updatedEventData = {
       title: title.trim(),
       description: description.trim(),
       duration: parseInt(duration) || 60,
       active,
     };
 
-    onSave(updatedEvent);
-    onClose();
+    try {
+      await updateEventMutation.mutateAsync({
+        id: event.id,
+        event: updatedEventData,
+      });
+      onClose();
+    } catch (error) {
+      Alert.alert("Error", "Failed to update event. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDelete = () => {
@@ -75,9 +87,16 @@ export default function EditEventModal({
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            onDelete(event.id);
-            onClose();
+          onPress: async () => {
+            setIsLoading(true);
+            try {
+              await deleteEventMutation.mutateAsync(event.id);
+              onClose();
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete event. Please try again.");
+            } finally {
+              setIsLoading(false);
+            }
           },
         },
       ]
@@ -99,6 +118,7 @@ export default function EditEventModal({
             <Text className="text-xl font-bold text-gray-800">Edit Event</Text>
             <TouchableOpacity
               onPress={onClose}
+              disabled={isLoading}
               className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center"
             >
               <X size={20} color="#6B7280" />
@@ -116,6 +136,7 @@ export default function EditEventModal({
               value={title}
               onChangeText={setTitle}
               placeholder="Play football⚽"
+              editable={!isLoading}
               className="bg-gray-50 rounded-2xl p-4 text-gray-800 text-lg"
               multiline={false}
             />
@@ -135,6 +156,7 @@ export default function EditEventModal({
                 onChangeText={setDuration}
                 placeholder="60"
                 keyboardType="numeric"
+                editable={!isLoading}
                 className="bg-gray-50 rounded-2xl p-4 text-gray-800 text-lg w-20 text-center"
               />
               <Text className="text-gray-600 ml-3 text-lg">minutes</Text>
@@ -150,6 +172,7 @@ export default function EditEventModal({
               value={description}
               onChangeText={setDescription}
               placeholder="Play football with me. Make some time to go outside and play!"
+              editable={!isLoading}
               className="bg-gray-50 rounded-2xl p-4 text-gray-800 min-h-[100px]"
               multiline={true}
               textAlignVertical="top"
@@ -171,7 +194,8 @@ export default function EditEventModal({
                 </Text>
               </View>
               <TouchableOpacity
-                onPress={() => setActive(!active)}
+                onPress={() => !isLoading && setActive(!active)}
+                disabled={isLoading}
                 className={`w-14 h-8 rounded-full p-1 ${active ? "bg-blue-500" : "bg-gray-300"}`}
               >
                 <View
@@ -187,24 +211,41 @@ export default function EditEventModal({
           <View className="flex-row space-x-3">
             <TouchableOpacity
               onPress={handleDelete}
-              className="bg-red-50 rounded-2xl px-6 py-4 flex-row items-center justify-center"
+              disabled={isLoading || deleteEventMutation.isPending}
+              className={`bg-red-50 rounded-2xl px-6 py-4 flex-row items-center justify-center ${
+                isLoading || deleteEventMutation.isPending ? "opacity-50" : ""
+              }`}
             >
               <Trash2 size={20} color="#EF4444" />
-              <Text className="text-red-500 font-semibold ml-2">Delete</Text>
+              <Text className="text-red-500 font-semibold ml-2">
+                {deleteEventMutation.isPending ? "Deleting..." : "Delete"}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={onClose}
-              className="bg-gray-50 rounded-2xl px-6 py-4 flex-1 items-center justify-center"
+              disabled={isLoading}
+              className={`bg-gray-50 rounded-2xl px-6 py-4 flex-1 items-center justify-center ${
+                isLoading ? "opacity-50" : ""
+              }`}
             >
               <Text className="text-gray-600 font-semibold">Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleSave}
-              className="bg-blue-500 rounded-2xl px-6 py-4 flex-1 items-center justify-center"
+              disabled={
+                isLoading || updateEventMutation.isPending || !title.trim()
+              }
+              className={`bg-blue-500 rounded-2xl px-6 py-4 flex-1 items-center justify-center ${
+                isLoading || updateEventMutation.isPending || !title.trim()
+                  ? "opacity-50"
+                  : ""
+              }`}
             >
-              <Text className="text-white font-semibold">Save</Text>
+              <Text className="text-white font-semibold">
+                {updateEventMutation.isPending ? "Saving..." : "Save"}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

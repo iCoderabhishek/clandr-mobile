@@ -1,3 +1,5 @@
+import { useAuth, useOAuth } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
   Alert,
@@ -10,12 +12,48 @@ import {
 } from "react-native";
 
 export default function AuthScreen() {
-  const handleGoogleAuth = () => {
-    Alert.alert(
-      "Google Sign In",
-      "Google authentication would be implemented here"
-    );
+  const { isSignedIn } = useAuth();
+  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
+  const router = useRouter();
+
+  // Redirect if already signed in
+  React.useEffect(() => {
+    if (isSignedIn) {
+      router.replace("/(tabs)");
+    }
+  }, [isSignedIn, router]);
+
+  const handleGoogleAuth = async () => {
+    try {
+      const { createdSessionId, setActive } = await startOAuthFlow();
+
+      if (createdSessionId) {
+        setActive!({ session: createdSessionId });
+        router.replace("/(tabs)");
+      }
+    } catch (err: any) {
+      console.error("OAuth error", err);
+
+      // Handle the case where user is already signed in
+      if (err.message?.includes("already signed in")) {
+        router.replace("/(tabs)");
+      } else {
+        Alert.alert(
+          "Authentication Error",
+          "Failed to sign in with Google. Please try again."
+        );
+      }
+    }
   };
+
+  // Show loading if already signed in
+  if (isSignedIn) {
+    return (
+      <SafeAreaView className="flex-1 bg-blue-500 items-center justify-center">
+        <Text className="text-white text-lg">Redirecting...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-blue-500">

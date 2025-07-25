@@ -1,12 +1,70 @@
 import ScheduleChart from "@/components/ScheduleChart";
-import scheduleData from "@/data/schedule.json";
+import { useApiClient } from "@/lib/api";
+import { useSaveSchedule, useSchedule } from "@/lib/queries";
+import { useAuth } from "@clerk/clerk-expo";
 import { Calendar, Clock, Users } from "lucide-react-native";
-import React, { useState } from "react";
-import { Alert, SafeAreaView, ScrollView, Text, View } from "react-native";
+import React from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 
 export default function MyScheduleScreen() {
-  const [schedule, setSchedule] = useState(scheduleData.weeklySchedule);
-  const [stats, setStats] = useState(scheduleData.stats);
+  const { isSignedIn } = useAuth();
+  useApiClient(); // Initialize API client with auth
+
+  const { data: scheduleData, isLoading, error } = useSchedule();
+  const saveScheduleMutation = useSaveSchedule();
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text className="text-gray-600 mt-4">Loading schedule...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center px-4">
+        <Text className="text-red-500 text-lg font-semibold mb-2">
+          Error loading schedule
+        </Text>
+        <Text className="text-gray-600 text-center">
+          Please check your connection and try again
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Show auth required state
+  if (!isSignedIn) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center px-4">
+        <Text className="text-gray-800 text-xl font-bold mb-2">
+          Sign in required
+        </Text>
+        <Text className="text-gray-600 text-center">
+          Please sign in to view your schedule
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
+  const schedule = scheduleData?.weeklySchedule || {};
+  const stats = scheduleData?.stats || {
+    totalSlots: 0,
+    availableSlots: 0,
+    bookedSlots: 0,
+    blockedSlots: 0,
+  };
 
   const handleSlotPress = (day: string, time: string, status: string) => {
     const statusMessages = {
@@ -24,7 +82,10 @@ export default function MyScheduleScreen() {
         {
           text: "Edit",
           style: "default",
-          onPress: () => console.log("Edit slot"),
+          onPress: () => {
+            // TODO: Implement slot editing
+            console.log("Edit slot", { day, time, status });
+          },
         },
       ]
     );

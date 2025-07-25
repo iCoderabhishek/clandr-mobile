@@ -1,8 +1,11 @@
-import eventsData from "@/data/event.json";
+import { useApiClient } from "@/lib/api";
+import { useEvents } from "@/lib/queries";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import * as Clipboard from "expo-clipboard";
 import { Clock, Copy, User } from "lucide-react-native";
-import React, { useState } from "react";
+import React from "react";
 import {
+  ActivityIndicator,
   Alert,
   SafeAreaView,
   ScrollView,
@@ -19,16 +22,59 @@ interface Event {
   active: boolean;
   bookings: number;
   created: string;
+  userId: string;
 }
 
 export default function PublicProfileScreen() {
-  const [events] = useState<Event[]>(eventsData as Event[]);
+  const { isSignedIn } = useAuth();
+  const { user } = useUser();
+  useApiClient(); // Initialize API client with auth
+
+  const { data: events = [], isLoading, error } = useEvents();
   const activeEvents = events.filter((event) => event.active);
 
-  const publicUrl = "https://cal.example.com/johndoe";
-  const userName = "John Doe";
+  const publicUrl = `https://cal.example.com/${user?.username || user?.id || "user"}`;
+  const userName = user?.fullName || user?.firstName || "User";
   const userBio =
     "Software Developer & Football Enthusiast. Book a session with me to discuss projects, grab coffee, or play some football!";
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text className="text-gray-600 mt-4">Loading profile...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center px-4">
+        <Text className="text-red-500 text-lg font-semibold mb-2">
+          Error loading profile
+        </Text>
+        <Text className="text-gray-600 text-center">
+          Please check your connection and try again
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Show auth required state
+  if (!isSignedIn) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center px-4">
+        <Text className="text-gray-800 text-xl font-bold mb-2">
+          Sign in required
+        </Text>
+        <Text className="text-gray-600 text-center">
+          Please sign in to view your public profile
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   const copyPublicUrl = async () => {
     await Clipboard.setStringAsync(publicUrl);

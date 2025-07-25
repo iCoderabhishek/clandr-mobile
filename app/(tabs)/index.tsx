@@ -1,5 +1,7 @@
 import EditEventModal from "@/components/EditEventModal";
-import eventsData from "@/data/event.json";
+import { useApiClient } from "@/lib/api";
+import { useDeleteEvent, useEvents, useUpdateEvent } from "@/lib/queries";
+import { useAuth } from "@clerk/clerk-expo";
 import {
   ChevronDown,
   Menu,
@@ -10,6 +12,7 @@ import {
 } from "lucide-react-native";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   Text,
@@ -26,14 +29,59 @@ interface Event {
   active: boolean;
   bookings: number;
   created: string;
+  userId: string;
 }
 
 export default function MyEventsScreen() {
-  const [events, setEvents] = useState<Event[]>(eventsData as Event[]);
+  const { isSignedIn } = useAuth();
+  useApiClient(); // Initialize API client with auth
+
+  const { data: events = [], isLoading, error } = useEvents();
+  const updateEventMutation = useUpdateEvent();
+  const deleteEventMutation = useDeleteEvent();
+
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDay, setSelectedDay] = useState("Today");
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text className="text-gray-600 mt-4">Loading events...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center px-4">
+        <Text className="text-red-500 text-lg font-semibold mb-2">
+          Error loading events
+        </Text>
+        <Text className="text-gray-600 text-center">
+          Please check your connection and try again
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
+  // Show auth required state
+  if (!isSignedIn) {
+    return (
+      <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center px-4">
+        <Text className="text-gray-800 text-xl font-bold mb-2">
+          Sign in required
+        </Text>
+        <Text className="text-gray-600 text-center">
+          Please sign in to view your events
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   const activeEvents = events.filter((event) => event.active);
   const todayEvents = activeEvents.slice(0, 2); // Mock today's events
@@ -57,18 +105,6 @@ export default function MyEventsScreen() {
   const handleEditEvent = (event: Event) => {
     setSelectedEvent(event);
     setModalVisible(true);
-  };
-
-  const handleSaveEvent = (updatedEvent: Event) => {
-    setEvents(
-      events.map((event) =>
-        event.id === updatedEvent.id ? updatedEvent : event
-      )
-    );
-  };
-
-  const handleDeleteEvent = (eventId: number) => {
-    setEvents(events.filter((event) => event.id !== eventId));
   };
 
   const getEventColor = (index: number) => {
@@ -266,8 +302,6 @@ export default function MyEventsScreen() {
           setModalVisible(false);
           setSelectedEvent(null);
         }}
-        onSave={handleSaveEvent}
-        onDelete={handleDeleteEvent}
       />
     </SafeAreaView>
   );
